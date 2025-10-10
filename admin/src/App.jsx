@@ -1,0 +1,29 @@
+import React from 'react'
+import Navbar from './components/Navbar/Navbar'
+import Sidebar from './components/Sidebar/Sidebar'
+import { Route, Routes } from 'react-router-dom'
+import Add from './pages/Add/Add'
+import List from './pages/List/List'
+import Order from './pages/Orders/Order'
+import { ToastContainer } from 'react-toastify';
+const App = () => {
+  return (
+    <div>
+      <ToastContainer></ToastContainer>
+      <Navbar />
+      <hr />
+      <div className='app-content flex'>
+        <Sidebar />
+        <div className='flex-1 p-6'>
+          <Routes>
+            <Route path="/add" element={<Add />} />
+            <Route path="/list" element={<List />} />
+            <Route path="/orders" element={<Order />} />
+          </Routes>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default App
