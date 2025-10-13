@@ -4,7 +4,7 @@ import { StoreContext } from '../../context/StoreContext';
 import axios from "axios"
 
 const LoginPopup = ({ setShowLogin }) => {
-  const { url, token, settoken } = useContext(StoreContext)
+  const { url, token, setToken } = useContext(StoreContext)
   const [currState, setCurrState] = useState("Sign Up");
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -46,7 +46,7 @@ const LoginPopup = ({ setShowLogin }) => {
       const response = await axios.post(newUrl, formData);
 
       if (response.data.success) {
-        settoken(response.data.token);
+        setToken(response.data.token);
         localStorage.setItem("token", response.data.token);
         setShowLogin(false);
         // console.log(response.data.token); 4

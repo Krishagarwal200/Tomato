@@ -4,7 +4,7 @@ import { StoreContext } from '../../context/StoreContext'
 import axios from 'axios';
 
 const PlaceOrder = () => {
-  const { cartItems, food_list, getTotalCartAmount, token, url } = useContext(StoreContext);
+  const { cartItems, foodList, getTotalCartAmount, token, url } = useContext(StoreContext);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -44,15 +44,18 @@ const PlaceOrder = () => {
       return;
     }
 
-    let orderItems = [];
-    food_list.forEach((item) => {
-      if (cartItems[item._id] > 0) {
+    // Prepare order items from cart
+    const orderItems = [];
+    Object.keys(cartItems).forEach(itemId => {
+      const cartItem = cartItems[itemId];
+      if (cartItem && cartItem.quantity > 0) {
+        const foodItem = foodList.find(item => item._id === itemId);
         orderItems.push({
-          foodId: item._id,
-          name: item.name,
-          price: item.price,
-          quantity: cartItems[item._id],
-          image: `${url}/images/${item.image}`
+          foodId: itemId,
+          name: foodItem ? foodItem.name : cartItem.name,
+          price: foodItem ? foodItem.price : cartItem.price,
+          quantity: cartItem.quantity,
+          image: foodItem ? foodItem.image : cartItem.image
         });
       }
     });
@@ -87,7 +90,6 @@ const PlaceOrder = () => {
         return;
       }
 
-      // ✅ CORRECT: Using singular "order" to match backend
       const response = await axios.post(`${url}/api/order/place`, orderData, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -99,13 +101,20 @@ const PlaceOrder = () => {
       console.log('Backend response:', response.data);
 
       if (response.data.success) {
-        const { session_url } = response.data;
-
-        if (session_url && session_url.startsWith('http')) {
-          window.location.replace(session_url);
+        if (formData.paymentMethod === 'cash') {
+          // For cash on delivery, show success message
+          alert('Order placed successfully! You will pay cash on delivery.');
+          // Clear cart and redirect
+          window.location.href = '/order-success';
         } else {
-          console.error('Invalid session URL:', session_url);
-          alert('Payment initialization failed. Please try again.');
+          // For online payments, redirect to payment gateway
+          const { session_url } = response.data;
+          if (session_url && session_url.startsWith('http')) {
+            window.location.replace(session_url);
+          } else {
+            console.error('Invalid session URL:', session_url);
+            alert('Payment initialization failed. Please try again.');
+          }
         }
       } else {
         alert('Failed to place order: ' + (response.data.message || 'Unknown error'));
@@ -113,11 +122,8 @@ const PlaceOrder = () => {
     } catch (error) {
       console.error('Order placement error:', error);
 
-      // Detailed error handling
       if (error.response) {
         console.error('Error response:', error.response.data);
-        console.error('Error status:', error.response.status);
-
         if (error.response.status === 401) {
           alert('Session expired. Please login again.');
         } else if (error.response.status === 400) {
@@ -128,7 +134,6 @@ const PlaceOrder = () => {
           alert('Error: ' + (error.response.data?.message || 'Failed to place order'));
         }
       } else if (error.request) {
-        console.error('No response received:', error.request);
         alert('Network error. Please check your connection and try again.');
       } else {
         alert('Error: ' + error.message);
@@ -145,7 +150,17 @@ const PlaceOrder = () => {
   const finalTotal = totalCartAmount + deliveryFee + tax;
 
   // Get cart items for display
-  const cartItemsList = food_list.filter(item => cartItems[item._id] > 0);
+  const cartItemsArray = Object.keys(cartItems)
+    .map(itemId => {
+      const cartItem = cartItems[itemId];
+      const foodItem = foodList.find(item => item._id === itemId);
+      return {
+        ...cartItem,
+        itemId,
+        foodItem
+      };
+    })
+    .filter(item => item.quantity > 0);
 
   return (
     <div className='max-w-6xl mx-auto px-4 py-8'>
@@ -158,7 +173,7 @@ const PlaceOrder = () => {
           <h2 className='text-2xl font-bold text-gray-800 mb-6'>Delivery Information</h2>
 
           <form onSubmit={placeOrder} className='space-y-6'>
-            {/* Full Name */}
+            {/* Form fields remain the same as your original */}
             <div>
               <label className='block text-sm font-medium text-gray-700 mb-2'>
                 Full Name *
@@ -174,7 +189,6 @@ const PlaceOrder = () => {
               />
             </div>
 
-            {/* Address */}
             <div>
               <label className='block text-sm font-medium text-gray-700 mb-2'>
                 Delivery Address *
@@ -190,7 +204,6 @@ const PlaceOrder = () => {
               />
             </div>
 
-            {/* City, Pincode, State */}
             <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
               <div>
                 <label className='block text-sm font-medium text-gray-700 mb-2'>
@@ -236,7 +249,6 @@ const PlaceOrder = () => {
               </div>
             </div>
 
-            {/* Phone Number */}
             <div>
               <label className='block text-sm font-medium text-gray-700 mb-2'>
                 Phone Number *
@@ -252,7 +264,6 @@ const PlaceOrder = () => {
               />
             </div>
 
-            {/* Payment Method */}
             <div>
               <label className='block text-sm font-medium text-gray-700 mb-4'>
                 Payment Method *
@@ -294,11 +305,10 @@ const PlaceOrder = () => {
               </div>
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
-              disabled={cartItemsList.length === 0 || loading}
-              className={`w-full py-3 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg ${cartItemsList.length === 0 || loading
+              disabled={cartItemsArray.length === 0 || loading}
+              className={`w-full py-3 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg ${cartItemsArray.length === 0 || loading
                 ? 'bg-gray-400 cursor-not-allowed text-white'
                 : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white'
                 }`}
@@ -308,7 +318,7 @@ const PlaceOrder = () => {
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
                   Processing...
                 </div>
-              ) : cartItemsList.length === 0 ? (
+              ) : cartItemsArray.length === 0 ? (
                 'Cart is Empty'
               ) : (
                 'Place Order'
@@ -323,24 +333,24 @@ const PlaceOrder = () => {
 
           {/* Order Items */}
           <div className='space-y-4 mb-6 max-h-64 overflow-y-auto'>
-            {cartItemsList.length === 0 ? (
+            {cartItemsArray.length === 0 ? (
               <p className='text-gray-500 text-center py-4'>No items in cart</p>
             ) : (
-              cartItemsList.map((item) => (
-                <div key={item._id} className='flex justify-between items-center pb-4 border-b border-gray-200'>
+              cartItemsArray.map((item) => (
+                <div key={item.itemId} className='flex justify-between items-center pb-4 border-b border-gray-200'>
                   <div className='flex items-center space-x-3'>
                     <img
-                      src={`${url}/images/${item.image}`}
-                      alt={item.name}
+                      src={`${url}/images/${item.foodItem?.image || item.image}`}
+                      alt={item.foodItem?.name || item.name}
                       className='w-12 h-12 rounded-lg object-cover'
                     />
                     <div>
-                      <h3 className='font-semibold text-gray-800'>{item.name}</h3>
-                      <p className='text-sm text-gray-500'>Quantity: {cartItems[item._id]}</p>
+                      <h3 className='font-semibold text-gray-800'>{item.foodItem?.name || item.name}</h3>
+                      <p className='text-sm text-gray-500'>Quantity: {item.quantity}</p>
                     </div>
                   </div>
                   <span className='font-semibold text-gray-800'>
-                    ${(item.price * cartItems[item._id]).toFixed(2)}
+                    ${((item.foodItem?.price || item.price) * item.quantity).toFixed(2)}
                   </span>
                 </div>
               ))
@@ -368,7 +378,6 @@ const PlaceOrder = () => {
             </div>
           </div>
 
-          {/* Back to Cart Button */}
           <Link
             to='/cart'
             className='block w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-medium transition-colors duration-200 text-center mb-3'
@@ -376,7 +385,6 @@ const PlaceOrder = () => {
             Back to Cart
           </Link>
 
-          {/* Delivery Info */}
           <div className='mt-6 p-4 bg-green-50 rounded-xl border border-green-200'>
             <div className='flex items-center space-x-2 text-green-700 mb-2'>
               <span>🚚</span>

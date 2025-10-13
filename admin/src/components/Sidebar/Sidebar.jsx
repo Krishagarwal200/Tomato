@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom'
 import { assets } from '../../assets/assets'
 
 const Sidebar = () => {
-  const [activeOption, setActiveOption] = useState('add');
+  const [activeOption, setActiveOption] = useState('');
 
   const sidebarOptions = [
     { id: 'add', icon: assets.add_icon, label: 'Add Items', path: '/add' },

@@ -1,11 +1,9 @@
 import express from "express";
 import multer from "multer";
 import fs from "fs";
-import {
-  addFood,
-  listFood,
-  removeFood,
-} from "../controllers/foodController.js";
+import { addFood, getFoodsByStore } from "../controllers/foodController.js";
+import authMiddleware from "../middleware/auth.js";
+// Import auth middleware
 
 const foodRouter = express.Router();
 
@@ -25,8 +23,9 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-foodRouter.post("/add", upload.single("image"), addFood);
-foodRouter.get("/list", listFood);
-foodRouter.delete("/:id", removeFood);
+// Add store authentication middleware to protect the route
+foodRouter.post("/store/add", authMiddleware, upload.single("image"), addFood);
+foodRouter.get("/store/:storeId", getFoodsByStore);
+// foodRouter.delete("/:id", removeFood);
 
 export default foodRouter;

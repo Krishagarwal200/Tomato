@@ -1,12 +1,12 @@
 import React, { useContext, useState } from 'react';
 import { assets } from '../../assets/assets';
-import { Link, useNavigate } from 'react-router-dom'; // Remove Navigate import
-import { StoreContext } from '../../context/StoreContext'; // Import directly from StoreContext
+import { Link, useNavigate } from 'react-router-dom';
+import { StoreContext } from '../../context/StoreContext';
 
-const Navbar = ({ setShowLogin }) => {
+const Navbar = ({ setShowLogin, setaddStore }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [menu, setMenu] = useState('Home');
-  const navigate = useNavigate(); // Initialize useNavigate hook
+  const navigate = useNavigate();
 
   const menuItems = [
     { name: 'Home', href: '#home' },
@@ -19,7 +19,6 @@ const Navbar = ({ setShowLogin }) => {
     setMenu(itemName);
     setIsMenuOpen(false);
 
-    // Smooth scroll to the section
     const element = document.querySelector(itemHref);
     if (element) {
       element.scrollIntoView({
@@ -29,24 +28,21 @@ const Navbar = ({ setShowLogin }) => {
     }
   };
 
-  const { cartItems, token, settoken } = useContext(StoreContext); // Combine context calls
+  const { token, setToken, getTotalCartItems } = useContext(StoreContext);
 
-  const getTotalItems = () => {
-    let total = 0;
-    Object.values(cartItems).forEach(quantity => {
-      total += quantity;
-    });
-    return total;
-  };
 
   const handleLogout = () => {
-    settoken('');
+    setToken('');
     localStorage.removeItem('token');
-    navigate('/'); // Use navigate instead of useNavigate()
+    navigate('/');
   };
 
   const GoToMyOrders = () => {
-    navigate('/myorders'); // Use navigate function
+    navigate('/myorders');
+  };
+
+  const handleRegisterStore = () => {
+    setaddStore(true); // This will open the store registration modal
   };
 
   return (
@@ -91,7 +87,7 @@ const Navbar = ({ setShowLogin }) => {
           </div>
 
           {/* Right Side Items */}
-          <div className="flex items-center space-x-6">
+          <div className="flex items-center space-x-4">
             {/* Search Icon */}
             <button>
               <img
@@ -111,18 +107,29 @@ const Navbar = ({ setShowLogin }) => {
                 />
               </Link>
               <div className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
-                {getTotalItems()}
+                {getTotalCartItems()}
               </div>
             </div>
 
-            {/* Profile Icon with Dropdown */}
+            {/* Auth Buttons */}
             {!token ? (
-              <button
-                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200"
-                onClick={() => setShowLogin(true)}
-              >
-                Sign In
-              </button>
+              <div className="flex items-center space-x-3">
+                {/* Register Store Button */}
+                <button
+                  className="border border-red-500 text-red-500 hover:bg-red-50 px-4 py-2 rounded-lg font-medium transition-colors duration-200"
+                  onClick={handleRegisterStore}
+                >
+                  Register Store
+                </button>
+
+                {/* Sign In Button */}
+                <button
+                  className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200"
+                  onClick={() => setShowLogin(true)}
+                >
+                  Sign In
+                </button>
+              </div>
             ) : (
               <div className="relative group">
                 <button className="p-2 hover:bg-gray-100 rounded-full transition-colors duration-200">
@@ -138,17 +145,29 @@ const Navbar = ({ setShowLogin }) => {
                   <div className="py-2">
                     <button
                       className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors duration-200 flex items-center gap-2"
-                      onClick={GoToMyOrders} // Use the function directly
+                      onClick={GoToMyOrders}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                       </svg>
                       My Orders
                     </button>
+
+                    {/* Add Store Management Link for Store Owners */}
+                    <button
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors duration-200 flex items-center gap-2"
+                      onClick={() => navigate('/store-dashboard')}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                      Store Dashboard
+                    </button>
+
                     <div className="border-t border-gray-100 my-1"></div>
                     <button
                       className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 transition-colors duration-200 flex items-center gap-2"
-                      onClick={handleLogout} // Use the function directly
+                      onClick={handleLogout}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -186,13 +205,35 @@ const Navbar = ({ setShowLogin }) => {
                       }`}
                     onClick={(e) => {
                       e.preventDefault();
-                      handleItemClick(item.name, itemHref);
+                      handleItemClick(item.name, item.href);
                     }}
                   >
                     {item.name}
                   </a>
                 </li>
               ))}
+
+              {/* Mobile Auth Buttons */}
+              {!token && (
+                <>
+                  <li>
+                    <button
+                      className="w-full text-left block font-medium py-3 px-4 rounded-lg text-red-500 hover:bg-red-50 transition-colors"
+                      onClick={handleRegisterStore}
+                    >
+                      Register Store
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      className="w-full text-left block font-medium py-3 px-4 rounded-lg text-white bg-red-500 hover:bg-red-600 transition-colors"
+                      onClick={() => setShowLogin(true)}
+                    >
+                      Sign In
+                    </button>
+                  </li>
+                </>
+              )}
             </ul>
           </div>
         )}

@@ -1,19 +1,26 @@
-// routes/orderRoute.js
 import express from "express";
 import {
-  listOrders,
   placeOrder,
-  updateOrderStatus,
-  userOrders,
-  verifyOrder,
+  getUserOrders,
+  getOrderDetails,
+  verifyPayment,
+  stripeWebhook,
 } from "../controllers/orderController.js";
 import authMiddleware from "../middleware/auth.js";
 
-const router = express.Router();
+const orderRouter = express.Router();
 
-router.post("/place", authMiddleware, placeOrder);
-router.post("/verify", authMiddleware, verifyOrder);
-router.post("/userorders", authMiddleware, userOrders);
-router.get("/list", listOrders);
-router.post("/update-status", updateOrderStatus);
-export default router;
+// Webhook route (must be before body parser middleware)
+orderRouter.post(
+  "/webhook",
+  express.raw({ type: "application/json" }),
+  stripeWebhook
+);
+
+// Protected routes
+orderRouter.post("/place", authMiddleware, placeOrder);
+orderRouter.post("/verify", authMiddleware, verifyPayment);
+orderRouter.get("/user-orders", authMiddleware, getUserOrders);
+orderRouter.get("/:orderId", authMiddleware, getOrderDetails);
+
+export default orderRouter;

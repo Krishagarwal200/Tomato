@@ -7,11 +7,21 @@ const foodSchema = new mongoose.Schema(
     description: { type: String, required: true },
     image: { type: String, required: true },
     category: { type: String, required: true },
+    store: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Store",
+      required: true,
+    },
+    isAvailable: {
+      type: Boolean,
+      default: true,
+    },
   },
   {
     timestamps: true,
   }
 );
-const foodModel = mongoose.models.food || mongoose.model("Food", foodSchema);
 
-export default foodModel;
+const Food = mongoose.models.Food || mongoose.model("Food", foodSchema);
+
+export default Food;

@@ -19,17 +19,27 @@ connectDB();
 import fs from "fs";
 import userRouter from "./routes/userRoute.js";
 import cartRouter from "./routes/cartRoute.js";
+import storeRouter from "./routes/storeRoute.js";
 //api endPoints
 app.use(express.urlencoded({ extended: true }));
 app.use("/api/food", foodRouter);
 app.use("/api/cart", cartRouter);
 app.use("/api/user", userRouter);
 app.use("/api/order", orderRouter);
+app.use("/api/stores", storeRouter);
 // Create uploads folder if it doesn't exist
 if (!fs.existsSync("uploads")) {
   fs.mkdirSync("uploads");
   console.log("Uploads folder created");
 }
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Serve static files from uploads directory
+app.use("/images", express.static(path.join(__dirname, "uploads")));
 
 app.use("/images", express.static("uploads/"));
 

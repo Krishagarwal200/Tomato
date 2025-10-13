@@ -2,6 +2,8 @@ import React, { useState } from 'react'
 import { assets } from '../../assets/assets'
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import { useContext } from 'react';
+import { StoreContext } from '../../context/StoreContext';
 
 const Add = () => {
   const url = "http://localhost:4000";
@@ -14,6 +16,7 @@ const Add = () => {
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const { storeToken, currentStore } = useContext(StoreContext);
 
   const onChangeHandler = (e) => {
     const name = e.target.name;
@@ -46,9 +49,21 @@ const Add = () => {
   const onSubmitHandler = async (e) => {
     e.preventDefault();
 
+    // Check if store is logged in
+    if (!storeToken || !currentStore) {
+      setMessage("Please login as a store to add products");
+      toast.error("Store authentication required");
+      return;
+    }
+
     // Validation
     if (!image) {
       setMessage("Please upload an image");
+      return;
+    }
+
+    if (!productData.name || !productData.description || !productData.price) {
+      setMessage("Please fill in all required fields");
       return;
     }
 
@@ -63,21 +78,22 @@ const Add = () => {
       formData.append("category", productData.category);
       formData.append("image", image);
 
+      console.log("Sending request with store token:", storeToken);
+      console.log("Current store:", currentStore.name);
 
-
-      const response = await axios.post(`${url}/api/food/add`, formData, {
+      const response = await axios.post(`${url}/api/food/store/add`, formData, {
         headers: {
-          'Content-Type': 'multipart/form-data'
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${storeToken}`, // Use Authorization header
         }
       });
 
+      console.log("Response:", response.data);
 
-
-      // Check different possible success indicators
-      if (response.data.success || response.status === 200 || response.data.message?.includes('success')) {
+      // Check success
+      if (response.data.success) {
         setMessage("Product added successfully!");
-        clearForm(); // Clear form on success
-
+        clearForm();
         toast.success("Product added successfully!");
       } else {
         setMessage(response.data.message || "Failed to add product");
@@ -85,21 +101,56 @@ const Add = () => {
       }
     } catch (error) {
       console.error("Error adding product:", error);
-      console.error("Error response:", error.response);
 
       if (error.response) {
         // Server responded with error status
-        setMessage(`Error: ${error.response.data.message || error.response.statusText}`);
+        const errorMsg = error.response.data.error || error.response.data.message || error.response.statusText;
+        setMessage(`Error: ${errorMsg}`);
+        toast.error(`Error: ${errorMsg}`);
+
+        // Specific error handling
+        if (error.response.status === 401) {
+          setMessage("Store authentication failed. Please login again.");
+        } else if (error.response.status === 404) {
+          setMessage("Store not found. Please check your store account.");
+        }
       } else if (error.request) {
         // Request was made but no response received
         setMessage("Network error: Could not connect to server");
+        toast.error("Network error: Could not connect to server");
       } else {
         // Something else happened
         setMessage("Error: " + error.message);
+        toast.error("Error: " + error.message);
       }
     } finally {
       setLoading(false);
     }
+  };
+
+  // Show store info if logged in
+  const StoreInfo = () => {
+    if (!currentStore) return null;
+
+    return (
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-blue-800">Adding product to: {currentStore.name}</h3>
+            <p className="text-blue-600 text-sm">{currentStore.email}</p>
+            {currentStore.storeInfo?.category && (
+              <span className="inline-block bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs mt-1">
+                {currentStore.storeInfo.category}
+              </span>
+            )}
+          </div>
+          <div className={`px-3 py-1 rounded-full text-sm font-medium ${currentStore.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+            }`}>
+            {currentStore.isActive ? 'Active' : 'Inactive'}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -107,11 +158,28 @@ const Add = () => {
       <h1 className='text-3xl font-bold text-gray-800 mb-2'>Add New Product</h1>
       <p className='text-gray-600 mb-8'>Add a new item to your restaurant menu</p>
 
+      {/* Store Info */}
+      <StoreInfo />
+
+      {/* Store Not Logged In Warning */}
+      {(!storeToken || !currentStore) && (
+        <div className='bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6'>
+          <div className="flex items-center">
+            <svg className="w-5 h-5 text-yellow-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <span className="text-yellow-700">You need to be logged in as a store to add products.</span>
+          </div>
+        </div>
+      )}
+
       {/* Success/Error Message */}
       {message && (
         <div className={`mb-6 p-4 rounded-xl ${message.includes("successfully")
           ? 'bg-green-100 text-green-700 border border-green-200'
-          : 'bg-red-100 text-red-700 border border-red-200'
+          : message.includes("Error") || message.includes("Failed")
+            ? 'bg-red-100 text-red-700 border border-red-200'
+            : 'bg-yellow-100 text-yellow-700 border border-yellow-200'
           }`}>
           {message}
         </div>
@@ -150,6 +218,7 @@ const Add = () => {
                 hidden
                 onChange={onImageChange}
                 accept="image/*"
+                disabled={!storeToken || !currentStore}
               />
             </label>
           </div>
@@ -169,7 +238,8 @@ const Add = () => {
               onChange={onChangeHandler}
               placeholder='Enter product name'
               required
-              className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200'
+              disabled={!storeToken || !currentStore}
+              className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200 disabled:bg-gray-100 disabled:cursor-not-allowed'
             />
           </div>
 
@@ -185,7 +255,8 @@ const Add = () => {
               placeholder='Enter product description'
               required
               rows='4'
-              className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200 resize-none'
+              disabled={!storeToken || !currentStore}
+              className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200 resize-none disabled:bg-gray-100 disabled:cursor-not-allowed'
             />
           </div>
 
@@ -203,7 +274,8 @@ const Add = () => {
               min='0'
               step='0.01'
               required
-              className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200'
+              disabled={!storeToken || !currentStore}
+              className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200 disabled:bg-gray-100 disabled:cursor-not-allowed'
             />
           </div>
 
@@ -217,7 +289,8 @@ const Add = () => {
               value={productData.category}
               onChange={onChangeHandler}
               required
-              className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200'
+              disabled={!storeToken || !currentStore}
+              className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200 disabled:bg-gray-100 disabled:cursor-not-allowed'
             >
               <option value="Salad">Salad</option>
               <option value="Rolls">Rolls</option>
@@ -235,18 +308,19 @@ const Add = () => {
         <div className='flex space-x-4 mt-8 pt-6 border-t border-gray-200'>
           <button
             type='submit'
-            disabled={loading}
-            className={`flex-1 py-3 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg ${loading
+            disabled={loading || !storeToken || !currentStore}
+            className={`flex-1 py-3 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg ${loading || !storeToken || !currentStore
               ? 'bg-gray-400 cursor-not-allowed text-white'
               : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white'
               }`}
           >
-            {loading ? 'Adding Product...' : 'Add Product'}
+            {loading ? 'Adding Product...' :
+              !storeToken || !currentStore ? 'Store Login Required' : 'Add Product'}
           </button>
           <button
             type='button'
             onClick={clearForm}
-            disabled={loading}
+            disabled={loading || !storeToken || !currentStore}
             className='flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-medium transition-colors duration-200 disabled:bg-gray-300 disabled:cursor-not-allowed'
           >
             Reset Form

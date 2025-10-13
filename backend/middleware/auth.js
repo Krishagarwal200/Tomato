@@ -1,10 +1,18 @@
 import jwt from "jsonwebtoken";
+import Store from "../models/storeModel.js"; // Import Store model
 
 const authMiddleware = async (req, res, next) => {
-  const token =
-    req.headers.authorization?.replace("Bearer ", "") || req.headers.token;
+  let token;
 
-  // console.log("Auth Token:", token); // Debug log
+  // Extract token from headers
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith("Bearer ")
+  ) {
+    token = req.headers.authorization.replace("Bearer ", "");
+  } else if (req.headers.token) {
+    token = req.headers.token;
+  }
 
   // Check if token exists
   if (!token) {
@@ -17,19 +25,31 @@ const authMiddleware = async (req, res, next) => {
   try {
     const token_decode = jwt.verify(token, process.env.JWT_SECRET);
 
-    // ✅ CORRECT: Set user info in req.user, not req.body
+    // For store authentication
+    if (token_decode.type === "store") {
+      const store = await Store.findById(token_decode.id).select("-password");
+      if (!store) {
+        return res.status(401).json({
+          success: false,
+          message: "Store not found.",
+        });
+      }
+      req.store = store; // Attach store to request
+      req.storeId = token_decode.id;
+    }
+
+    // Set user/store info in request
     req.user = {
       id: token_decode.id,
-      ...token_decode, // Include any other token data
+      type: token_decode.type || "user", // 'user' or 'store'
+      ...token_decode,
     };
-    req.userId = token_decode.id; // Direct access for convenience
+    req.userId = token_decode.id;
 
-    // console.log("Authenticated user ID:", token_decode.id); // Debug log
     next();
   } catch (error) {
-    console.error("JWT Verification Error:", error);
+    console.error("JWT Verification Error:", error.message);
 
-    // Specific error messages
     if (error.name === "JsonWebTokenError") {
       return res.status(401).json({
         success: false,
