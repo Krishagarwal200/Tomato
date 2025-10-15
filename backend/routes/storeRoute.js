@@ -6,14 +6,20 @@ import {
 } from "../controllers/storeController.js";
 import { getStoreById } from "../controllers/storeController.js";
 import { getStoreItems } from "../controllers/storeController.js";
-
-const router = express.Router();
+import storeAuth from "../middleware/storeAuth.js";
+const storeRouter = express.Router();
+storeRouter.get("/profile", storeAuth, (req, res) => {
+  res.json({
+    success: true,
+    store: req.store,
+  });
+});
 
 // Public routes
-router.post("/register", storeRegister);
-router.post("/login", storeLogin);
-router.get("/", getAllStores); // Add this route to get all stores
+storeRouter.post("/register", storeRegister);
+storeRouter.post("/login", storeLogin);
+storeRouter.get("/", getAllStores); // Add this route to get all stores
 // Add these routes
-router.get("/:storeId", getStoreById); // Get store by ID
-router.get("/:storeId/items", getStoreItems); // Get store items
-export default router;
+storeRouter.get("/:storeId", getStoreById); // Get store by ID
+storeRouter.get("/:storeId/items", getStoreItems); // Get store items
+export default storeRouter;

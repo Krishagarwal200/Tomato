@@ -1,6 +1,7 @@
 import React, { useContext, useState, useEffect } from 'react'
 import { StoreContext } from '../../context/StoreContext'
 import { useNavigate } from 'react-router-dom'
+import axios from 'axios'
 
 const Dashboard = () => {
   const { url, setToken, currentStore } = useContext(StoreContext)
@@ -10,50 +11,90 @@ const Dashboard = () => {
     totalOrders: 0,
     totalRevenue: 0,
     activeProducts: 0,
-    pendingOrders: 0
+    pendingOrders: 0,
+    todayOrders: 0
   })
 
   const [recentOrders, setRecentOrders] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    // Simulate loading store data
     const loadStoreData = async () => {
       try {
-        // In a real app, you would fetch store-specific data here
-        setTimeout(() => {
+        const storeToken = localStorage.getItem('storeToken')
+
+        if (!storeToken) {
+          navigate('/store/login')
+          return
+        }
+
+        // Fetch store stats
+        const statsResponse = await axios.get(`${url}/api/storeOrder/stats`, {
+          headers: {
+            'Authorization': `Bearer ${storeToken}`
+          }
+        })
+
+        if (statsResponse.data.success) {
+          const statsData = statsResponse.data.stats
           setStats({
-            totalOrders: 156,
-            totalRevenue: 12540,
-            activeProducts: 24,
-            pendingOrders: 8
+            totalOrders: statsData.totalOrders || 0,
+            totalRevenue: statsData.totalRevenue || 0,
+            activeProducts: statsData.activeProducts || 0,
+            pendingOrders: statsData.pendingOrders || 0,
+            todayOrders: statsData.todayOrders || 0
           })
+        }
 
-          setRecentOrders([
-            { id: 1, customer: 'John Doe', items: 3, amount: 45.99, status: 'Delivered', time: '2 min ago' },
-            { id: 2, customer: 'Jane Smith', items: 2, amount: 28.50, status: 'Preparing', time: '15 min ago' },
-            { id: 3, customer: 'Mike Johnson', items: 1, amount: 12.75, status: 'Pending', time: '25 min ago' },
-            { id: 4, customer: 'Sarah Wilson', items: 4, amount: 52.30, status: 'Delivered', time: '1 hour ago' }
-          ])
+        // Fetch recent orders
+        const ordersResponse = await axios.get(`${url}/api/storeOrder/orders`, {
+          headers: {
+            'Authorization': `Bearer ${storeToken}`
+          },
+          params: {
+            limit: 5,
+            page: 1
+          }
+        })
 
-          setLoading(false)
-        }, 1500)
+        if (ordersResponse.data.success) {
+          setRecentOrders(ordersResponse.data.orders || [])
+        }
+
+        setLoading(false)
       } catch (error) {
         console.error('Error loading store data:', error)
+        setError('Failed to load dashboard data')
         setLoading(false)
+
+        // If unauthorized, redirect to login
+        if (error.response?.status === 401) {
+          localStorage.removeItem('storeToken')
+          localStorage.removeItem('storeInfo')
+          navigate('/store/login')
+        }
       }
     }
 
     if (currentStore) {
       loadStoreData()
+    } else {
+      // If no currentStore but token exists, try to get store info
+      const storeToken = localStorage.getItem('storeToken')
+      if (storeToken) {
+        loadStoreData()
+      } else {
+        navigate('/store/login')
+      }
     }
-  }, [currentStore])
+  }, [currentStore, url, navigate])
 
   const handleLogout = () => {
     localStorage.removeItem('storeToken')
     localStorage.removeItem('storeInfo')
     setToken('')
-    navigate('/store/dashboard')
+    navigate('/store/login')
   }
 
   const handleManageProducts = () => {
@@ -68,10 +109,74 @@ const Dashboard = () => {
     navigate('/add')
   }
 
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount)
+  }
+
+  const formatOrderStatus = (status) => {
+    const statusColors = {
+      pending: 'bg-yellow-100 text-yellow-800',
+      confirmed: 'bg-blue-100 text-blue-800',
+      preparing: 'bg-orange-100 text-orange-800',
+      out_for_delivery: 'bg-purple-100 text-purple-800',
+      delivered: 'bg-green-100 text-green-800',
+      cancelled: 'bg-red-100 text-red-800'
+    }
+
+    const statusText = {
+      pending: 'Pending',
+      confirmed: 'Confirmed',
+      preparing: 'Preparing',
+      out_for_delivery: 'Out for Delivery',
+      delivered: 'Delivered',
+      cancelled: 'Cancelled'
+    }
+
+    return (
+      <span className={`inline-block px-2 py-1 text-xs rounded-full ${statusColors[status] || 'bg-gray-100 text-gray-800'}`}>
+        {statusText[status] || status}
+      </span>
+    )
+  }
+
+  const formatTime = (dateString) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffInMinutes = Math.floor((now - date) / (1000 * 60))
+
+    if (diffInMinutes < 1) return 'Just now'
+    if (diffInMinutes < 60) return `${diffInMinutes} min ago`
+    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)} hours ago`
+    return `${Math.floor(diffInMinutes / 1440)} days ago`
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">Error Loading Dashboard</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     )
   }
@@ -148,22 +253,22 @@ const Dashboard = () => {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-                  <p className="text-2xl font-semibold text-gray-900">${stats.totalRevenue}</p>
+                  <p className="text-2xl font-semibold text-gray-900">{formatCurrency(stats.totalRevenue)}</p>
                 </div>
               </div>
             </div>
 
-            {/* Active Products */}
+            {/* Today's Orders */}
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex items-center">
                 <div className="p-3 bg-purple-100 rounded-lg">
                   <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Active Products</p>
-                  <p className="text-2xl font-semibold text-gray-900">{stats.activeProducts}</p>
+                  <p className="text-sm font-medium text-gray-600">Today's Orders</p>
+                  <p className="text-2xl font-semibold text-gray-900">{stats.todayOrders}</p>
                 </div>
               </div>
             </div>
@@ -249,19 +354,23 @@ const Dashboard = () => {
               ) : (
                 <div className="space-y-4">
                   {recentOrders.map((order) => (
-                    <div key={order.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                    <div key={order._id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                       <div>
-                        <h3 className="font-semibold text-gray-900">{order.customer}</h3>
-                        <p className="text-sm text-gray-600">{order.items} items • ${order.amount}</p>
+                        <h3 className="font-semibold text-gray-900">
+                          {order.user?.name || 'Customer'}
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          {order.items?.length || 0} items • {formatCurrency(order.amount)}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Order #{order.orderNumber}
+                        </p>
                       </div>
                       <div className="text-right">
-                        <span className={`inline-block px-2 py-1 text-xs rounded-full ${order.status === 'Delivered' ? 'bg-green-100 text-green-800' :
-                          order.status === 'Preparing' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                          {order.status}
-                        </span>
-                        <p className="text-sm text-gray-500 mt-1">{order.time}</p>
+                        {formatOrderStatus(order.orderStatus)}
+                        <p className="text-sm text-gray-500 mt-1">
+                          {formatTime(order.createdAt)}
+                        </p>
                       </div>
                     </div>
                   ))}

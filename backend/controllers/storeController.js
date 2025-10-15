@@ -18,7 +18,7 @@ const generateToken = (storeId) => {
   );
 };
 
-// Store Registration
+// Store Registration - FIXED
 export const storeRegister = async (req, res) => {
   try {
     const { name, email, password, storeInfo } = req.body;
@@ -61,6 +61,9 @@ export const storeRegister = async (req, res) => {
 
     const savedStore = await newStore.save();
 
+    // ✅ FIX: Generate token after successful registration
+    const token = generateToken(savedStore._id);
+
     res.status(201).json({
       success: true,
       message: "Store registered successfully",
@@ -71,10 +74,81 @@ export const storeRegister = async (req, res) => {
         storeInfo: savedStore.storeInfo,
         isActive: savedStore.isActive,
       },
+      token, // ✅ Include token in response
     });
   } catch (error) {
     console.error("Store registration error:", error);
 
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+};
+
+// Store Login - FIXED
+export const storeLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    console.log("🔵 Store Login Request:", { email });
+
+    // Validation
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide email and password",
+      });
+    }
+
+    // Find store by email
+    const store = await Store.findOne({ email: email.toLowerCase() });
+    if (!store) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
+
+    // Check if store is active
+    if (!store.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: "Store account is deactivated. Please contact support.",
+      });
+    }
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, store.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
+
+    console.log("✅ Store login successful for:", store.name);
+
+    // ✅ FIX: Use the generateToken function consistently
+    const token = generateToken(store._id);
+
+    // Return response without password
+    res.status(200).json({
+      success: true,
+      message: "Store login successful",
+      store: {
+        id: store._id,
+        name: store.name,
+        email: store.email,
+        storeInfo: store.storeInfo,
+        isActive: store.isActive,
+        products: store.products,
+      },
+      token,
+    });
+  } catch (error) {
+    console.error("❌ Store login error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -151,80 +225,3 @@ export const getStoreItems = async (req, res) => {
 };
 
 // Store Login
-export const storeLogin = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    console.log("🔵 Store Login Request:", { email });
-
-    // Validation
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide email and password",
-      });
-    }
-
-    // Find store by email
-    const store = await Store.findOne({ email: email.toLowerCase() });
-    if (!store) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password",
-      });
-    }
-
-    // Check if store is active
-    if (!store.isActive) {
-      return res.status(401).json({
-        success: false,
-        message: "Store account is deactivated. Please contact support.",
-      });
-    }
-
-    // Verify password
-    const isPasswordValid = await bcrypt.compare(password, store.password);
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password",
-      });
-    }
-
-    console.log("✅ Store login successful for:", store.name);
-
-    // Generate JWT token
-    const token = jwt.sign(
-      {
-        id: store._id,
-        type: "store",
-        email: store.email,
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "30d" }
-    );
-
-    // Return response without password
-    res.status(200).json({
-      success: true,
-      message: "Store login successful",
-      store: {
-        id: store._id,
-        name: store.name,
-        email: store.email,
-        storeInfo: store.storeInfo,
-        isActive: store.isActive,
-        products: store.products,
-        orders: store.orders,
-      },
-      token,
-    });
-  } catch (error) {
-    console.error("❌ Store login error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
-    });
-  }
-};

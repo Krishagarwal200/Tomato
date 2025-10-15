@@ -22,14 +22,16 @@ const Navbar = ({ setStoreLogin }) => {
 
   const handleLogout = () => {
     // Clear token and user data
-    localStorage.removeItem('token')
+    localStorage.removeItem('storeToken')
     setToken('')
     setShowDropdown(false)
     console.log('Logged out successfully')
-    navigate("/store/dashboard");
+    navigate("/");
   }
 
   const handleLogoClick = () => {
+    const token = localStorage.getItem('token');
+    console.log(token);
     navigate('/store/dashboard')
     setStoreLogin(false)
   }

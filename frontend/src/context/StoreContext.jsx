@@ -20,7 +20,7 @@ const StoreContextProvider = (props) => {
   const addToCart = async (item) => {
     if (!token) {
       toast.error('Please login to add items to cart');
-      navigate('/login');
+      navigate('/');
       return;
     }
 
@@ -56,7 +56,7 @@ const StoreContextProvider = (props) => {
         toast.error('Please login again');
         localStorage.removeItem('token');
         setToken('');
-        navigate('/login');
+        navigate('/');
       } else if (error.response?.data?.message) {
         toast.error(error.response.data.message);
       } else {
@@ -168,19 +168,15 @@ const StoreContextProvider = (props) => {
   };
 
   // Fetch food list
-  const fetchFoodList = async () => {
-    // try {
-    //   setLoading(true);
-    //   const response = await axios.get(`${url}/api/food/list`);
-    //   if (response.data.success) {
-    //     setFoodList(response.data.foods || []);
-    //   }
-    // } catch (error) {
-    //   console.error("Error fetching food list:", error);
-    //   toast.error('Failed to load food items');
-    // } finally {
-    //   setLoading(false);
-    // }
+  const fetchFoodItems = async () => {
+    try {
+      const response = await axios.get(`${url}/api/food`);
+      if (response.data.success) {
+        setFoodList(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching food items:', error);
+    }
   };
 
   // Load cart items
@@ -243,7 +239,7 @@ const StoreContextProvider = (props) => {
   // Load data when component mounts
   useEffect(() => {
     const loadData = async () => {
-      await fetchFoodList();
+      await fetchFoodItems();
 
       const savedToken = localStorage.getItem("token");
       if (savedToken) {
@@ -259,6 +255,7 @@ const StoreContextProvider = (props) => {
   useEffect(() => {
     if (token) {
       loadCartItems();
+      fetchFoodItems();
     }
   }, [token]);
 
@@ -276,12 +273,12 @@ const StoreContextProvider = (props) => {
     removeFromCart,
     setToken,
     loadCartItems,
-    fetchFoodList,
+
     getTotalCartAmount,
     getTotalCartItems,
     getItemQuantity,
     logout,
-
+    fetchFoodItems,
     // Constants
     url
   };

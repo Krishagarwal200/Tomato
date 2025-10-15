@@ -3,6 +3,7 @@ import cors from "cors";
 import { connectDB } from "./config/db.js";
 import foodRouter from "./routes/foodRoute.js";
 import orderRouter from "./routes/orderRoute.js";
+import StoreOrderRouter from "./routes/storeOrderRouter.js";
 import "dotenv/config";
 import dotenv from "dotenv";
 dotenv.config({ override: true });
@@ -27,6 +28,7 @@ app.use("/api/cart", cartRouter);
 app.use("/api/user", userRouter);
 app.use("/api/order", orderRouter);
 app.use("/api/stores", storeRouter);
+app.use("/api/storeOrder", StoreOrderRouter);
 // Create uploads folder if it doesn't exist
 if (!fs.existsSync("uploads")) {
   fs.mkdirSync("uploads");

@@ -7,6 +7,11 @@ const orderSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    store: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Store",
+      required: true,
+    },
     items: [
       {
         foodId: {
@@ -88,15 +93,29 @@ const orderSchema = new mongoose.Schema(
     stripePaymentIntentId: {
       type: String,
     },
+    stripeSessionId: {
+      type: String,
+    },
     orderNumber: {
       type: String,
       unique: true,
+    },
+    storeNotes: {
+      type: String, // For store admin to add notes
+    },
+    estimatedDeliveryTime: {
+      type: Number, // in minutes
     },
   },
   {
     timestamps: true,
   }
 );
+
+// Add indexes for store queries
+orderSchema.index({ store: 1, createdAt: -1 });
+orderSchema.index({ store: 1, orderStatus: 1 });
+orderSchema.index({ store: 1, paymentStatus: 1 });
 
 // Generate order number before saving
 orderSchema.pre("save", async function (next) {

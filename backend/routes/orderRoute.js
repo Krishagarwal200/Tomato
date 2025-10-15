@@ -4,18 +4,17 @@ import {
   getUserOrders,
   getOrderDetails,
   verifyPayment,
-  stripeWebhook,
 } from "../controllers/orderController.js";
 import authMiddleware from "../middleware/auth.js";
 
 const orderRouter = express.Router();
 
 // Webhook route (must be before body parser middleware)
-orderRouter.post(
-  "/webhook",
-  express.raw({ type: "application/json" }),
-  stripeWebhook
-);
+// orderRouter.post(
+//   "/webhook",
+//   express.raw({ type: "application/json" }),
+//   stripeWebhook
+// );
 
 // Protected routes
 orderRouter.post("/place", authMiddleware, placeOrder);

@@ -1,11 +1,26 @@
 import React, { useState, useContext } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { StoreContext } from '../../context/StoreContext'
 import axios from 'axios';
+import { useEffect } from 'react';
 
 const PlaceOrder = () => {
   const { cartItems, foodList, getTotalCartAmount, token, url } = useContext(StoreContext);
-
+  const navigate = useNavigate();
+  useEffect(() => {
+    const testFetch = async () => {
+      try {
+        const response = await axios.get(`${url}/api/food`);
+        console.log('Food API Response:', response.data);
+        if (response.data.success) {
+          console.log('First food item with store:', response.data.data[0]);
+        }
+      } catch (error) {
+        console.error('Test fetch failed:', error);
+      }
+    };
+    testFetch();
+  }, [url]);
   const [formData, setFormData] = useState({
     name: '',
     address: '',
@@ -44,7 +59,7 @@ const PlaceOrder = () => {
       return;
     }
 
-    // Prepare order items from cart
+    // Prepare order items with store ID
     const orderItems = [];
     Object.keys(cartItems).forEach(itemId => {
       const cartItem = cartItems[itemId];
@@ -55,7 +70,8 @@ const PlaceOrder = () => {
           name: foodItem ? foodItem.name : cartItem.name,
           price: foodItem ? foodItem.price : cartItem.price,
           quantity: cartItem.quantity,
-          image: foodItem ? foodItem.image : cartItem.image
+          image: foodItem ? foodItem.image : cartItem.image,
+          storeId: foodItem?.store || cartItem.storeId
         });
       }
     });
@@ -65,6 +81,20 @@ const PlaceOrder = () => {
       setLoading(false);
       return;
     }
+
+    // Check if all items are from the same store
+    // const storeIds = [...new Set(orderItems.map(item => item.storeId))];
+    // if (storeIds.length > 1) {
+    //   alert('Please order from one store at a time. Your cart contains items from multiple stores.');
+    //   setLoading(false);
+    //   return;
+    // }
+
+    // Calculate totals
+    const totalCartAmount = getTotalCartAmount ? getTotalCartAmount() : 0;
+    const deliveryFee = totalCartAmount > 0 ? 5 : 0;
+    const tax = totalCartAmount * 0.1;
+    const finalTotal = totalCartAmount + deliveryFee + tax;
 
     // Prepare order data
     const orderData = {
@@ -81,7 +111,7 @@ const PlaceOrder = () => {
       paymentMethod: formData.paymentMethod
     };
 
-    console.log('Sending order data:', orderData);
+
 
     try {
       if (!token) {
@@ -89,25 +119,30 @@ const PlaceOrder = () => {
         setLoading(false);
         return;
       }
-
+      console.log(cartItems);
       const response = await axios.post(`${url}/api/order/place`, orderData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        timeout: 15000
+        timeout: 30000
       });
 
       console.log('Backend response:', response.data);
 
       if (response.data.success) {
         if (formData.paymentMethod === 'cash') {
-          // For cash on delivery, show success message
+          // For cash on delivery
           alert('Order placed successfully! You will pay cash on delivery.');
-          // Clear cart and redirect
-          window.location.href = '/order-success';
+          // Redirect to success page
+          navigate('/order-success', {
+            state: {
+              order: response.data.order,
+              message: 'Order placed successfully! You will pay cash on delivery.'
+            }
+          });
         } else {
-          // For online payments, redirect to payment gateway
+          // For online payments, redirect to Stripe
           const { session_url } = response.data;
           if (session_url && session_url.startsWith('http')) {
             window.location.replace(session_url);
@@ -122,18 +157,27 @@ const PlaceOrder = () => {
     } catch (error) {
       console.error('Order placement error:', error);
 
-      if (error.response) {
+      // Detailed error handling
+      if (error.code === 'ECONNABORTED') {
+        alert('Request timeout. The server is taking too long to respond. Please try again.');
+      } else if (error.response) {
         console.error('Error response:', error.response.data);
+        console.error('Error status:', error.response.status);
+
         if (error.response.status === 401) {
           alert('Session expired. Please login again.');
+          navigate('/login');
         } else if (error.response.status === 400) {
           alert('Invalid order data: ' + (error.response.data?.message || 'Please check your information'));
+        } else if (error.response.status === 404) {
+          alert('Store not found or inactive. Please try ordering from a different store.');
         } else if (error.response.status === 500) {
           alert('Server error. Please try again later.');
         } else {
           alert('Error: ' + (error.response.data?.message || 'Failed to place order'));
         }
       } else if (error.request) {
+        console.error('No response received:', error.request);
         alert('Network error. Please check your connection and try again.');
       } else {
         alert('Error: ' + error.message);
@@ -162,6 +206,16 @@ const PlaceOrder = () => {
     })
     .filter(item => item.quantity > 0);
 
+  // Debug to see what's available
+  console.log('Food item structure:', cartItemsArray[0]?.foodItem);
+
+  // Updated storeName logic
+  const storeName = cartItemsArray.length > 0
+    ? cartItemsArray[0].foodItem?.store?.name ||  // If store is populated as object
+    cartItemsArray[0].storeName ||              // If storeName is in cart item
+    'Store'
+    : 'Store';
+
   return (
     <div className='max-w-6xl mx-auto px-4 py-8'>
       <h1 className='text-4xl font-bold text-gray-800 mb-2 text-center'>Place Your Order</h1>
@@ -173,7 +227,7 @@ const PlaceOrder = () => {
           <h2 className='text-2xl font-bold text-gray-800 mb-6'>Delivery Information</h2>
 
           <form onSubmit={placeOrder} className='space-y-6'>
-            {/* Form fields remain the same as your original */}
+            {/* Full Name */}
             <div>
               <label className='block text-sm font-medium text-gray-700 mb-2'>
                 Full Name *
@@ -189,6 +243,7 @@ const PlaceOrder = () => {
               />
             </div>
 
+            {/* Address */}
             <div>
               <label className='block text-sm font-medium text-gray-700 mb-2'>
                 Delivery Address *
@@ -204,6 +259,7 @@ const PlaceOrder = () => {
               />
             </div>
 
+            {/* City, Pincode, State */}
             <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
               <div>
                 <label className='block text-sm font-medium text-gray-700 mb-2'>
@@ -249,6 +305,7 @@ const PlaceOrder = () => {
               </div>
             </div>
 
+            {/* Phone Number */}
             <div>
               <label className='block text-sm font-medium text-gray-700 mb-2'>
                 Phone Number *
@@ -264,6 +321,7 @@ const PlaceOrder = () => {
               />
             </div>
 
+            {/* Payment Method */}
             <div>
               <label className='block text-sm font-medium text-gray-700 mb-4'>
                 Payment Method *
@@ -305,6 +363,7 @@ const PlaceOrder = () => {
               </div>
             </div>
 
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={cartItemsArray.length === 0 || loading}
@@ -321,7 +380,7 @@ const PlaceOrder = () => {
               ) : cartItemsArray.length === 0 ? (
                 'Cart is Empty'
               ) : (
-                'Place Order'
+                `Place Order with ${storeName}`
               )}
             </button>
           </form>
@@ -330,6 +389,13 @@ const PlaceOrder = () => {
         {/* Order Summary */}
         <div className='bg-white rounded-2xl shadow-lg p-6 h-fit sticky top-8'>
           <h2 className='text-2xl font-bold text-gray-800 mb-6'>Order Summary</h2>
+
+          {/* Store Info */}
+          {storeName && (
+            <div className='mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200'>
+              <p className='text-blue-700 font-medium'>Ordering from: {storeName}</p>
+            </div>
+          )}
 
           {/* Order Items */}
           <div className='space-y-4 mb-6 max-h-64 overflow-y-auto'>
@@ -378,6 +444,7 @@ const PlaceOrder = () => {
             </div>
           </div>
 
+          {/* Back to Cart Button */}
           <Link
             to='/cart'
             className='block w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-medium transition-colors duration-200 text-center mb-3'
@@ -385,6 +452,7 @@ const PlaceOrder = () => {
             Back to Cart
           </Link>
 
+          {/* Delivery Info */}
           <div className='mt-6 p-4 bg-green-50 rounded-xl border border-green-200'>
             <div className='flex items-center space-x-2 text-green-700 mb-2'>
               <span>🚚</span>
@@ -395,7 +463,7 @@ const PlaceOrder = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default PlaceOrder
+export default PlaceOrder;

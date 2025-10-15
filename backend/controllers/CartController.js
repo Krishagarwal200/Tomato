@@ -148,12 +148,20 @@ export const addToCart = async (req, res) => {
       });
     }
 
-    // Find the food item to get its details
-    const foodItem = await foodModel.findById(foodId);
+    // Find the food item to get its details and store ID
+    const foodItem = await foodModel.findById(foodId).populate("store");
     if (!foodItem) {
       return res.status(404).json({
         success: false,
         message: "Food item not found",
+      });
+    }
+
+    const newStoreId = foodItem.store?._id?.toString();
+    if (!newStoreId) {
+      return res.status(400).json({
+        success: false,
+        message: "Food item does not belong to any store",
       });
     }
 
@@ -162,7 +170,48 @@ export const addToCart = async (req, res) => {
       user.cartData = new Map();
     }
 
-    // Check if item already exists in cart
+    // Check if cart has items from different store
+    let currentStoreId = null;
+    let itemsToRemove = [];
+
+    if (user.cartData.size > 0) {
+      // Get all food IDs in cart to check their store
+      const cartFoodIds = Array.from(user.cartData.keys());
+
+      // Find store IDs for all items in cart
+      const foodItemsInCart = await foodModel
+        .find({
+          _id: { $in: cartFoodIds },
+        })
+        .select("store");
+
+      // Create a map of foodId to storeId
+      const foodStoreMap = {};
+      foodItemsInCart.forEach((item) => {
+        foodStoreMap[item._id.toString()] = item.store?.toString();
+      });
+
+      // Check if any item belongs to a different store
+      user.cartData.forEach((value, key) => {
+        const itemStoreId = foodStoreMap[key];
+        if (itemStoreId && itemStoreId !== newStoreId) {
+          itemsToRemove.push(key);
+        } else if (itemStoreId) {
+          currentStoreId = itemStoreId; // Set current store ID
+        }
+      });
+    }
+
+    // If adding item from different store, clear all existing items
+    if (itemsToRemove.length > 0) {
+      itemsToRemove.forEach((foodIdToRemove) => {
+        user.cartData.delete(foodIdToRemove);
+      });
+
+      console.log(`Cleared ${itemsToRemove.length} items from different store`);
+    }
+
+    // Check if item already exists in cart (after potential clearing)
     const existingItem = user.cartData.get(foodId);
 
     if (existingItem) {
@@ -176,6 +225,8 @@ export const addToCart = async (req, res) => {
         name: foodItem.name,
         price: foodItem.price,
         image: foodItem.image,
+        storeId: newStoreId,
+        storeName: foodItem.store?.name || "Unknown Store",
         addedAt: new Date(),
       });
     }
@@ -198,18 +249,27 @@ export const addToCart = async (req, res) => {
       totalAmount += item.quantity * item.price;
     });
 
+    // Prepare response message
+    let message = "Item added to cart successfully";
+    if (itemsToRemove.length > 0) {
+      message = `Cart cleared and item added. You can only order from one store at a time.`;
+    }
+
     res.status(200).json({
       success: true,
-      message: "Item added to cart successfully",
+      message: message,
       cartData: cartDataObject,
       totalItems: totalItems,
       totalAmount: totalAmount,
+      storeId: newStoreId,
+      storeName: foodItem.store?.name || "Unknown Store",
       item: {
         id: foodId,
         name: foodItem.name,
         quantity: existingItem ? existingItem.quantity : quantity,
         price: foodItem.price,
       },
+      clearedItems: itemsToRemove.length > 0 ? itemsToRemove : undefined,
     });
   } catch (error) {
     console.error("Add to cart error:", error);
@@ -338,7 +398,17 @@ export const decreaseCartItem = async (req, res) => {
     }
 
     res.status(500).json({
-      success: false,
+      /*************  ✨ Windsurf Command ⭐  *************/
+      /**
+ * Decrease the quantity of a food item in the user's cart by 1.
+ * If the quantity becomes 0, the item is removed from the cart.
+ * @param {Object} req.body - Request body containing the food ID to decrease.
+ * @param {Object} req.userId - The ID of the user making the request.
+ * @returns {Object} Response containing the updated cart data and totals.
+ * @throws {Error} 400 - If the food ID is invalid.
+ * @throws {Error} 404 - If the item is not found in the cart.
+ * @throws {Error} 500 - If an internal server error occurs.
+/*******  1fba4b98-1011-4fd3-8504-6601c2553299  *******/ success: false,
       message: "Internal server error",
       error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
@@ -479,41 +549,5 @@ export const removeFromCart = async (req, res) => {
     });
   }
 };
-// Your other cart functions (removeFromCart, getCart, etc.) go here...
-// export const getCart = async (req, res) => {
-//   try {
-//     const userId = req.userId;
-
-//     const user = await userModel.findById(userId);
-//     if (!user) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "User not found",
-//       });
-//     }
-
-//     // Initialize cartData if not exists
-//     if (!user.cartData || typeof user.cartData !== "object") {
-//       user.cartData = {};
-//       await user.save();
-//     }
-
-//     const cartWithDetails = await getCartWithDetails(user.cartData);
-
-//     res.status(200).json({
-//       success: true,
-//       cartData: user.cartData,
-//       cartWithDetails: cartWithDetails,
-//       itemCount: Object.keys(user.cartData).length,
-//       totalAmount: calculateTotalAmount(cartWithDetails),
-//     });
-//   } catch (error) {
-//     console.error("Get cart error:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Internal server error",
-//     });
-//   }
-// };
 
 // Add your removeFromCart, clearCart functions here...

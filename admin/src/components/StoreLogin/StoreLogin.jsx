@@ -35,7 +35,7 @@ const StoreLogin = ({ setStoreLogin }) => {
       setLoading(false);
       return;
     }
-
+    console.log(formData);
     try {
       const response = await axios.post(`${url}/api/stores/login`, {
         email: formData.email,
@@ -45,9 +45,11 @@ const StoreLogin = ({ setStoreLogin }) => {
       if (response.data.success) {
         // Store token and store info
         localStorage.setItem('storeToken', response.data.token);
+        console.log(response.data.token);
+        console.log("hey");
         setToken(response.data.token);
         localStorage.setItem('storeInfo', JSON.stringify(response.data.store));
-
+        console.log(response.data.store);
         // Clear form data
         setFormData({
           email: '',

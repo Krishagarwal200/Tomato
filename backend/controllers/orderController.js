@@ -1,7 +1,7 @@
 import Order from "../models/orderModel.js";
 import User from "../models/userModel.js";
 import Stripe from "stripe";
-
+import Store from "../models/storeModel.js";
 // Helper function to get Stripe instance
 const getStripe = () => {
   if (!process.env.STRIPE_SECRET_KEY) {
@@ -16,18 +16,12 @@ const getStripe = () => {
 
 const frontend_url = process.env.FRONTEND_URL || "http://localhost:5174";
 const backend_url = process.env.BACKEND_URL || "http://localhost:4000";
-
 export const placeOrder = async (req, res) => {
   try {
-    // Initialize Stripe inside the function
-    const stripe = getStripe();
-
     const { items, amount, address, paymentMethod } = req.body;
     const userId = req.userId;
 
     console.log("🟡 Placing order for user:", userId);
-    console.log("🟡 Payment method:", paymentMethod);
-    console.log("🟡 Order amount:", amount);
 
     // Validate required fields
     if (!items || items.length === 0) {
@@ -37,25 +31,28 @@ export const placeOrder = async (req, res) => {
       });
     }
 
-    if (!amount || amount <= 0) {
+    // Get store ID from the first item
+    const storeId = items[0]?.storeId;
+    if (!storeId) {
       return res.status(400).json({
         success: false,
-        message: "Valid order amount is required",
+        message: "Store information is required",
       });
     }
 
-    if (
-      !address ||
-      !address.name ||
-      !address.street ||
-      !address.city ||
-      !address.state ||
-      !address.zipCode ||
-      !address.phone
-    ) {
+    // Verify store exists and is active
+    const store = await Store.findById(storeId);
+    if (!store) {
+      return res.status(404).json({
+        success: false,
+        message: "Store not found",
+      });
+    }
+
+    if (!store.isActive) {
       return res.status(400).json({
         success: false,
-        message: "Complete address information is required",
+        message: "This store is currently inactive",
       });
     }
 
@@ -68,9 +65,10 @@ export const placeOrder = async (req, res) => {
       });
     }
 
-    // Create order
+    // Create order with store reference
     const order = new Order({
       user: userId,
+      store: storeId,
       items: items,
       address: address,
       amount: amount,
@@ -80,16 +78,15 @@ export const placeOrder = async (req, res) => {
     });
 
     const savedOrder = await order.save();
-    console.log("✅ Order created:", savedOrder._id);
+    console.log("✅ Order created:", savedOrder._id, "for store:", store.name);
 
-    // Handle different payment methods
+    // Clear user's cart
+    user.cartData = new Map();
+    await user.save();
+    console.log("✅ Cart cleared for user:", userId);
+
+    // Handle payment methods
     if (paymentMethod === "cash") {
-      // For cash on delivery, order is placed directly
-      // Clear user's cart after successful order placement
-      user.cartData = new Map();
-      await user.save();
-      console.log("✅ Cart cleared for user:", userId);
-
       return res.status(201).json({
         success: true,
         message: "Order placed successfully. You will pay cash on delivery.",
@@ -97,25 +94,23 @@ export const placeOrder = async (req, res) => {
           id: savedOrder._id,
           orderNumber: savedOrder.orderNumber,
           amount: savedOrder.amount,
-          items: savedOrder.items,
-          address: savedOrder.address,
-          orderStatus: savedOrder.orderStatus,
-          paymentMethod: savedOrder.paymentMethod,
+          store: {
+            id: store._id,
+            name: store.name,
+          },
         },
       });
     } else if (paymentMethod === "card" || paymentMethod === "upi") {
-      // For online payments, create Stripe checkout session
+      // For online payments - create Stripe checkout session
+      const stripe = getStripe();
 
-      // Prepare line items for Stripe
+      // Prepare line items for Stripe - SIMPLIFIED VERSION
       const line_items = items.map((item) => ({
         price_data: {
           currency: "usd",
           product_data: {
             name: item.name,
-            images: [`${backend_url}/images/${item.image}`],
-            metadata: {
-              foodId: item.foodId,
-            },
+            // No images or metadata to avoid Stripe errors
           },
           unit_amount: Math.round(item.price * 100), // Convert to cents
         },
@@ -134,10 +129,12 @@ export const placeOrder = async (req, res) => {
         quantity: 1,
       });
 
-      // Add tax as a separate line item
-      const taxAmount =
-        amount -
-        (items.reduce((sum, item) => sum + item.price * item.quantity, 0) + 5);
+      // Add tax as a separate line item if applicable
+      const subtotal = items.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0
+      );
+      const taxAmount = amount - (subtotal + 5);
       if (taxAmount > 0) {
         line_items.push({
           price_data: {
@@ -151,20 +148,22 @@ export const placeOrder = async (req, res) => {
         });
       }
 
-      console.log("🟡 Creating Stripe checkout session...");
+      console.log("🟡 Creating Stripe checkout session for store:", store.name);
 
-      // Create Stripe checkout session
+      // Create Stripe checkout session with proper string metadata
+      // Create Stripe checkout session - MINIMAL VERSION
       const session = await stripe.checkout.sessions.create({
         payment_method_types: paymentMethod === "upi" ? ["card"] : ["card"],
         line_items: line_items,
         mode: "payment",
-        success_url: `${frontend_url}/verify?success=true&orderId=${savedOrder._id}`,
+        success_url: `${frontend_url}/verify?success=true&orderId=${savedOrder._id}&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${frontend_url}/verify?success=false&orderId=${savedOrder._id}`,
         customer_email: user.email,
         client_reference_id: savedOrder._id.toString(),
         metadata: {
           orderId: savedOrder._id.toString(),
           userId: userId.toString(),
+          storeId: storeId.toString(),
           paymentMethod: paymentMethod,
         },
         shipping_options: [
@@ -172,23 +171,15 @@ export const placeOrder = async (req, res) => {
             shipping_rate_data: {
               type: "fixed_amount",
               fixed_amount: {
-                amount: 500, // $5.00 in cents
+                amount: 500,
                 currency: "usd",
               },
               display_name: "Delivery fee",
             },
           },
         ],
-        shipping_address_collection: {
-          allowed_countries: ["US", "CA", "IN"],
-        },
-        custom_text: {
-          shipping_address: {
-            message: "Note: We'll deliver your order to this address.",
-          },
-        },
+        // Remove custom_text entirely to avoid any issues
       });
-
       console.log("✅ Stripe session created successfully:", session.id);
 
       // Update order with Stripe session ID
@@ -200,6 +191,10 @@ export const placeOrder = async (req, res) => {
         session_url: session.url,
         sessionId: session.id,
         orderId: savedOrder._id,
+        store: {
+          id: store._id,
+          name: store.name,
+        },
         message: "Redirect to payment gateway",
       });
     } else {
@@ -236,6 +231,14 @@ export const placeOrder = async (req, res) => {
       });
     }
 
+    // Handle duplicate order number
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: "Order number conflict. Please try again.",
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -243,13 +246,126 @@ export const placeOrder = async (req, res) => {
     });
   }
 };
+const handleOnlinePayment = async (
+  order,
+  user,
+  items,
+  amount,
+  paymentMethod,
+  res
+) => {
+  try {
+    const stripe = getStripe();
 
+    // Prepare line items quickly
+    const line_items = [
+      ...items.map((item) => ({
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: item.name,
+            // Remove images if they're causing delays
+            // images: [`${backend_url}/images/${item.image}`],
+          },
+          unit_amount: Math.round(item.price * 100),
+        },
+        quantity: item.quantity,
+      })),
+      {
+        price_data: {
+          currency: "usd",
+          product_data: { name: "Delivery Fee" },
+          unit_amount: 500,
+        },
+        quantity: 1,
+      },
+    ];
+
+    // Add tax if needed
+    const subtotal = items.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    );
+    const taxAmount = amount - (subtotal + 5);
+    if (taxAmount > 0) {
+      line_items.push({
+        price_data: {
+          currency: "usd",
+          product_data: { name: "Tax" },
+          unit_amount: Math.round(taxAmount * 100),
+        },
+        quantity: 1,
+      });
+    }
+
+    console.log("🟡 Creating Stripe checkout session...");
+
+    // Create Stripe session with timeout
+    const session = await Promise.race([
+      stripe.checkout.sessions.create({
+        payment_method_types: ["card"],
+        line_items: line_items,
+        mode: "payment",
+        success_url: `${frontend_url}/verify?success=true&orderId=${order._id}&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${frontend_url}/verify?success=false&orderId=${order._id}`,
+        customer_email: user.email,
+        metadata: {
+          orderId: order._id.toString(),
+          userId: user._id.toString(),
+        },
+        // Remove optional features to speed up
+        // shipping_address_collection: {
+        //   allowed_countries: ['US', 'CA', 'IN'],
+        // },
+      }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Stripe timeout")), 10000)
+      ),
+    ]);
+
+    console.log("✅ Stripe session created:", session.id);
+
+    // Update order with session ID
+    order.stripeSessionId = session.id;
+    await order.save();
+
+    res.json({
+      success: true,
+      session_url: session.url,
+      sessionId: session.id,
+      orderId: order._id,
+    });
+  } catch (error) {
+    console.error("❌ Online payment handling error:", error);
+
+    // If Stripe fails, mark order as failed but don't delete it
+    order.paymentStatus = "failed";
+    order.orderStatus = "cancelled";
+    await order.save();
+
+    if (error.message === "Stripe timeout") {
+      return res.status(408).json({
+        success: false,
+        message: "Payment service timeout. Please try again.",
+      });
+    }
+
+    res.status(400).json({
+      success: false,
+      message: "Failed to initialize payment",
+      error: error.message,
+    });
+  }
+};
 export const verifyPayment = async (req, res) => {
   try {
     const { orderId, sessionId } = req.body;
     const userId = req.userId;
 
-    console.log("🟡 Verifying payment for order:", orderId);
+    console.log("🔍 VERIFY PAYMENT DEBUG:");
+    console.log("Order ID:", orderId);
+    console.log("Session ID:", sessionId);
+    console.log("User ID:", userId);
 
     if (!orderId || !sessionId) {
       return res.status(400).json({
@@ -263,6 +379,8 @@ export const verifyPayment = async (req, res) => {
 
     // Find the order
     const order = await Order.findOne({ _id: orderId, user: userId });
+    console.log("🔍 Order found:", order ? "Yes" : "No");
+
     if (!order) {
       return res.status(404).json({
         success: false,
@@ -270,27 +388,55 @@ export const verifyPayment = async (req, res) => {
       });
     }
 
-    // Check Stripe session status directly
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    console.log("🔍 Current order status:", {
+      paymentStatus: order.paymentStatus,
+      orderStatus: order.orderStatus,
+      stripeSessionId: order.stripeSessionId,
+    });
 
-    console.log("🟡 Stripe session status:", session.status);
-    console.log("🟡 Stripe payment status:", session.payment_status);
+    // Check Stripe session status directly
+    const session = await stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ["payment_intent"],
+    });
+
+    console.log("🔍 Stripe session details:", {
+      status: session.status,
+      payment_status: session.payment_status,
+      payment_intent: session.payment_intent?.status,
+    });
 
     if (session.payment_status === "paid") {
+      console.log("💰 Payment is PAID - updating order status...");
+
       // Payment successful
       order.paymentStatus = "completed";
       order.orderStatus = "confirmed";
       order.stripePaymentIntentId = session.payment_intent;
+      order.stripeSessionId = sessionId;
 
-      // Clear user's cart
+      // Double-check user exists and clear cart
       const user = await User.findById(userId);
       if (user) {
+        console.log("🔍 User cart before clear:", user.cartData);
         user.cartData = new Map();
         await user.save();
+
+        // Verify cart was cleared
+        const updatedUser = await User.findById(userId);
+        console.log("🔍 User cart after clear:", updatedUser.cartData);
         console.log("✅ Cart cleared for user:", userId);
+      } else {
+        console.log("❌ User not found when trying to clear cart");
       }
 
       await order.save();
+
+      // Verify order was updated
+      const updatedOrder = await Order.findById(orderId);
+      console.log("🔍 Order after update:", {
+        paymentStatus: updatedOrder.paymentStatus,
+        orderStatus: updatedOrder.orderStatus,
+      });
 
       console.log("✅ Payment verified successfully for order:", orderId);
 
@@ -304,65 +450,20 @@ export const verifyPayment = async (req, res) => {
           items: order.items,
           orderStatus: order.orderStatus,
           paymentStatus: order.paymentStatus,
+          address: order.address,
         },
       });
     } else {
-      // Payment failed or not completed
-      order.paymentStatus = "failed";
-      order.orderStatus = "cancelled";
-      await order.save();
-
-      console.log("❌ Payment not completed for order:", orderId);
-
-      return res.status(400).json({
-        success: false,
-        message: "Payment not completed. Please try again.",
-        order: {
-          id: order._id,
-          orderNumber: order.orderNumber,
-        },
-      });
+      console.log("❌ Payment status is:", session.payment_status);
+      // Handle other statuses...
     }
   } catch (error) {
     console.error("❌ Verify payment error:", error);
-
-    // Handle Stripe errors
-    if (error.type?.startsWith("Stripe")) {
-      return res.status(400).json({
-        success: false,
-        message: "Error verifying payment with Stripe",
-        error: error.message,
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      message: "Error verifying payment",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
-    });
+    // Error handling...
   }
 };
 
 // Webhook handler (if you decide to use webhooks later)
-export const stripeWebhook = async (req, res) => {
-  const sig = req.headers["stripe-signature"];
-  let event;
-
-  try {
-    const stripe = getStripe();
-    event = stripe.webhooks.constructEvent(
-      req.body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
-  } catch (err) {
-    console.error(`❌ Webhook signature verification failed.`, err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
-
-  console.log(`🟡 Webhook received: ${event.type}`);
-  res.json({ received: true });
-};
 
 // Get user's orders
 export const getUserOrders = async (req, res) => {
@@ -411,5 +512,29 @@ export const getOrderDetails = async (req, res) => {
       success: false,
       message: "Internal server error",
     });
+  }
+};
+// Add to your orderController.js temporarily
+export const testClearCart = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const user = await User.findById(userId);
+
+    console.log("🔍 Cart before clear:", user.cartData);
+    user.cartData = new Map();
+    await user.save();
+
+    const updatedUser = await User.findById(userId);
+    console.log("🔍 Cart after clear:", updatedUser.cartData);
+
+    res.json({
+      success: true,
+      message: "Cart cleared manually",
+      cartBefore: user.cartData,
+      cartAfter: updatedUser.cartData,
+    });
+  } catch (error) {
+    console.error("Test clear cart error:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
