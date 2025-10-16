@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 
 const Dashboard = () => {
-  const { url, setToken, currentStore } = useContext(StoreContext)
+  const { url, setStoreToken, currentStore } = useContext(StoreContext)
   const navigate = useNavigate()
 
   const [stats, setStats] = useState({
@@ -93,8 +93,8 @@ const Dashboard = () => {
   const handleLogout = () => {
     localStorage.removeItem('storeToken')
     localStorage.removeItem('storeInfo')
-    setToken('')
-    navigate('/store/login')
+    setStoreToken('')
+    navigate('/')
   }
 
   const handleManageProducts = () => {

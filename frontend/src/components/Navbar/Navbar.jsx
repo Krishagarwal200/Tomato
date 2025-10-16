@@ -42,7 +42,8 @@ const Navbar = ({ setShowLogin, setaddStore }) => {
   };
 
   const handleRegisterStore = () => {
-    setaddStore(true); // This will open the store registration modal
+    window.open('http://localhost:5173', '_blank');
+    // setaddStore(true); // This will open the store registration modal
   };
 
   return (

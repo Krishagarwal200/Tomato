@@ -4,15 +4,16 @@ import { useNavigate } from 'react-router-dom'
 import { useContext } from 'react'
 import { StoreContext } from '../../context/StoreContext'
 
-const Navbar = ({ setStoreLogin }) => {
+const Navbar = () => {
   const [showDropdown, setShowDropdown] = useState(false)
   const navigate = useNavigate()
-  const { token, setToken } = useContext(StoreContext)
+  const { setStoreToken, storeToken } = useContext(StoreContext)
 
   const handleProfileClick = () => {
-    setStoreLogin(true)
+    navigate("/store/login")
     setShowDropdown(false)
   }
+
 
   const handleAdminLogin = () => {
     // Navigate to admin login or show admin login modal
@@ -23,7 +24,7 @@ const Navbar = ({ setStoreLogin }) => {
   const handleLogout = () => {
     // Clear token and user data
     localStorage.removeItem('storeToken')
-    setToken('')
+    setStoreToken('')
     setShowDropdown(false)
     console.log('Logged out successfully')
     navigate("/");
@@ -33,7 +34,7 @@ const Navbar = ({ setStoreLogin }) => {
     const token = localStorage.getItem('token');
     console.log(token);
     navigate('/store/dashboard')
-    setStoreLogin(false)
+
   }
 
   return (
@@ -58,7 +59,7 @@ const Navbar = ({ setStoreLogin }) => {
               onClick={() => setShowDropdown(!showDropdown)}
             >
               <span className='text-gray-700 font-medium'>
-                {token ? 'Admin User' : 'Guest'}
+                {storeToken ? 'Admin User' : 'Guest'}
               </span>
               <img
                 className='h-8 w-8 rounded-full object-cover border-2 border-gray-300'
@@ -94,7 +95,7 @@ const Navbar = ({ setStoreLogin }) => {
                 <div className='border-t border-gray-100 my-1'></div>
 
                 {/* Conditional rendering based on token */}
-                {token ? (
+                {storeToken ? (
                   // Logout option when token exists
                   <button
                     onClick={handleLogout}

@@ -95,8 +95,51 @@ export const updateOrderStatus = async (req, res) => {
       });
     }
 
-    // Update the order
+    // Prepare update data
     const updateData = { orderStatus: status };
+
+    // Enhanced payment status logic
+    switch (status) {
+      case "delivered":
+        // Mark cash on delivery payments as completed upon delivery
+        if (
+          order.paymentMethod === "cash" &&
+          order.paymentStatus === "pending"
+        ) {
+          updateData.paymentStatus = "completed";
+          console.log("💰 Cash on delivery payment marked as completed");
+        }
+        // For online payments, they should already be completed, but double-check
+        if (
+          (order.paymentMethod === "card" || order.paymentMethod === "upi") &&
+          order.paymentStatus === "pending"
+        ) {
+          updateData.paymentStatus = "completed";
+          console.log("💰 Online payment marked as completed upon delivery");
+        }
+        break;
+
+      case "cancelled":
+        // Handle payment status for cancelled orders
+        if (order.paymentStatus === "completed") {
+          // Payment was made, so refund is needed
+          updateData.paymentStatus = "refunded";
+          console.log("💰 Payment marked as refunded for cancelled order");
+        } else if (order.paymentStatus === "pending") {
+          // No payment was completed, so mark as failed
+          updateData.paymentStatus = "failed";
+          console.log("💰 Payment marked as failed for cancelled order");
+        }
+        // If payment was already failed or refunded, no change needed
+        break;
+
+      default:
+        // For other status changes, payment status remains unchanged
+        console.log("📊 Order status changed, payment status unchanged");
+        break;
+    }
+
+    // Add optional fields
     if (notes) updateData.storeNotes = notes;
     if (estimatedDeliveryTime)
       updateData.estimatedDeliveryTime = estimatedDeliveryTime;
@@ -108,6 +151,14 @@ export const updateOrderStatus = async (req, res) => {
     ).populate("user", "name email phone");
 
     console.log("✅ Order status updated successfully");
+    console.log(
+      "📊 Final Status - Order:",
+      updatedOrder.orderStatus,
+      "Payment:",
+      updatedOrder.paymentStatus,
+      "Method:",
+      updatedOrder.paymentMethod
+    );
 
     res.status(200).json({
       success: true,

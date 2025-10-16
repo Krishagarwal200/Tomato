@@ -19,8 +19,8 @@ const StoreContextProvider = (props) => {
   // Add item to cart
   const addToCart = async (item) => {
     if (!token) {
-      toast.error('Please login to add items to cart');
-      navigate('/');
+      window.alert('Please login/SignUp to add items to cart');
+
       return;
     }
 
@@ -256,6 +256,7 @@ const StoreContextProvider = (props) => {
     if (token) {
       loadCartItems();
       fetchFoodItems();
+      getTotalCartItems();
     }
   }, [token]);
 

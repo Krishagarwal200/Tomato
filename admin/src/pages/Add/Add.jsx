@@ -4,9 +4,11 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useContext } from 'react';
 import { StoreContext } from '../../context/StoreContext';
+import { useNavigate } from 'react-router-dom';
 
 const Add = () => {
   const url = "http://localhost:4000";
+  const navigate = useNavigate();
   const [image, setImage] = useState(false);
   const [productData, setProductData] = useState({
     name: "",
@@ -125,6 +127,7 @@ const Add = () => {
       }
     } finally {
       setLoading(false);
+      navigate("/store/dashboard");
     }
   };
 

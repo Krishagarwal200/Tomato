@@ -5,7 +5,7 @@ export const StoreContext = createContext(null);
 const url = "http://localhost:4000";
 
 const StoreContextProvider = (props) => {
-  const [token, setToken] = useState("");
+  // const [token, setToken] = useState("");
   const [storeToken, setStoreToken] = useState("");
   const [foodList, setFoodList] = useState([]);
 
@@ -13,9 +13,9 @@ const StoreContextProvider = (props) => {
 
   useEffect(() => {
     const loadData = async () => {
-      const savedToken = localStorage.getItem("token");
+      const savedToken = localStorage.getItem("storeToken");
       if (savedToken) {
-        setToken(savedToken);
+        setStoreToken(savedToken);
       }
 
       const savedStoreToken = localStorage.getItem("storeToken");
@@ -35,8 +35,7 @@ const StoreContextProvider = (props) => {
 
   const contextValue = {
     url,
-    token,
-    setToken,
+
     storeToken,
     setStoreToken,
     food_list: foodList,

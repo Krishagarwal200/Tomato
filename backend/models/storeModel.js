@@ -134,7 +134,7 @@ storeSchema.methods.getStoreStats = async function () {
       $group: {
         _id: null,
         totalOrders: { $sum: 1 },
-        totalRevenue: { $sum: "$totalAmount" }, // Changed from $amount to $totalAmount
+        totalRevenue: { $sum: "$amount" }, // Changed to $amount
         pendingOrders: {
           $sum: {
             $cond: [
@@ -145,12 +145,16 @@ storeSchema.methods.getStoreStats = async function () {
           },
         },
         completedOrders: {
-          $sum: { $cond: [{ $eq: ["$orderStatus", "delivered"] }, 1, 0] },
+          $sum: {
+            $cond: [{ $eq: ["$orderStatus", "delivered"] }, 1, 0],
+          },
         },
         cancelledOrders: {
-          $sum: { $cond: [{ $eq: ["$orderStatus", "cancelled"] }, 1, 0] },
+          $sum: {
+            $cond: [{ $eq: ["$orderStatus", "cancelled"] }, 1, 0],
+          },
         },
-        averageOrderValue: { $avg: "$totalAmount" }, // Changed from $amount to $totalAmount
+        averageOrderValue: { $avg: "$amount" }, // Changed to $amount
       },
     },
   ]);
@@ -179,7 +183,6 @@ storeSchema.methods.getStoreStats = async function () {
         todayOrders: 0,
       };
 };
-
 // Add method to get recent orders
 storeSchema.methods.getRecentOrders = async function (limit = 5) {
   const Order = mongoose.model("Order");

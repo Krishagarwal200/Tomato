@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { StoreContext } from '../../context/StoreContext';
 
-const StoreLogin = ({ setStoreLogin }) => {
-  const { url, setToken } = useContext(StoreContext);
+const StoreLogin = () => {
+  const { url, setStoreToken, setCurrentStore } = useContext(StoreContext);
   // const url = "http://localhost:4000";
   const navigate = useNavigate();
 
@@ -47,9 +47,10 @@ const StoreLogin = ({ setStoreLogin }) => {
         localStorage.setItem('storeToken', response.data.token);
         console.log(response.data.token);
         console.log("hey");
-        setToken(response.data.token);
+        setStoreToken(response.data.token);
         localStorage.setItem('storeInfo', JSON.stringify(response.data.store));
         console.log(response.data.store);
+        setCurrentStore(response.data.store);
         // Clear form data
         setFormData({
           email: '',
@@ -57,7 +58,7 @@ const StoreLogin = ({ setStoreLogin }) => {
         });
 
         // Redirect to store dashboard
-        setStoreLogin(false);
+
         navigate('/store/dashboard');
       } else {
         setError(response.data.message || 'Login failed');
@@ -77,6 +78,15 @@ const StoreLogin = ({ setStoreLogin }) => {
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         {/* Header */}
+        <div className="flex justify-between items-center p-6 border-b border-gray-200">
+
+          <button
+            onClick={() => navigate("/")}
+            className="text-gray-500 hover:text-gray-700 text-2xl font-bold transition-colors"
+          >
+            ×
+          </button>
+        </div>
         <div className="text-center">
           <div className="mx-auto h-12 w-12 bg-red-500 rounded-full flex items-center justify-center">
             <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

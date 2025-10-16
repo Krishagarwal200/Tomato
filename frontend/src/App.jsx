@@ -11,6 +11,7 @@ import MyOrders from './pages/MyOrders/MyOrders'
 import AddStore from './components/AddStore/AddStore'
 import StoreDetails from './components/StoreDetails/StoreDetails'
 import StoreList from './components/StoreList/StoreList'
+import OrderSuccess from './pages/OrderSuccess/OrderSucces'
 
 const App = () => {
   const [showLogin, setShowLogin] = useState(false);
@@ -30,7 +31,8 @@ const App = () => {
           <Route path='/verify' element={<Verify />} />
           <Route path='/myorders' element={<MyOrders />} />
           <Route path='/stores' element={<StoreList />} />
-          <Route path='/store/:storeId' element={<StoreDetails />} /> {/* Updated route */}
+          <Route path='/store/:storeId' element={<StoreDetails />} />
+          <Route path='/order-success' element={<OrderSuccess />} />
         </Routes>
         <Footer />
       </div>
