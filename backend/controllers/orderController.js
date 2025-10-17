@@ -13,10 +13,10 @@ const getStripe = () => {
     apiVersion: "2024-09-30.acacia",
   });
 };
-const API_URL = import.meta.env.VITE_API_URL;
-const url = API_URL;
-// const frontend_url = process.env.FRONTEND_URL || "http://localhost:5174";
-// const backend_url = process.env.BACKEND_URL || "http://localhost:4000";
+// const API_URL = import.meta.env.VITE_API_URL;
+// const url = API_URL;
+const frontend_url = process.env.FRONTEND_URL || "http://localhost:5174";
+const backend_url = process.env.BACKEND_URL || "http://localhost:4000";
 export const placeOrder = async (req, res) => {
   try {
     const { items, amount, address, paymentMethod } = req.body;
