@@ -5,7 +5,7 @@ import { StoreContext } from '../../context/StoreContext';
 
 const StoreLogin = () => {
   const { url, setStoreToken, setCurrentStore } = useContext(StoreContext);
-  // const url = "http://localhost:4000";
+
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({

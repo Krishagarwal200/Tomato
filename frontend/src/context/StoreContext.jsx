@@ -4,8 +4,9 @@ import { toast } from 'react-toastify';
 import { useNavigate } from "react-router-dom";
 
 export const StoreContext = createContext(null);
+const API_URL = import.meta.env.VITE_API_URL;
 
-const url = "http://localhost:4000";
+const url = API_URL;
 
 const StoreContextProvider = (props) => {
   const [token, setToken] = useState("");

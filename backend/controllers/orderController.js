@@ -13,9 +13,10 @@ const getStripe = () => {
     apiVersion: "2024-09-30.acacia",
   });
 };
-
-const frontend_url = process.env.FRONTEND_URL || "http://localhost:5174";
-const backend_url = process.env.BACKEND_URL || "http://localhost:4000";
+const API_URL = import.meta.env.VITE_API_URL;
+const url = API_URL;
+// const frontend_url = process.env.FRONTEND_URL || "http://localhost:5174";
+// const backend_url = process.env.BACKEND_URL || "http://localhost:4000";
 export const placeOrder = async (req, res) => {
   try {
     const { items, amount, address, paymentMethod } = req.body;
@@ -154,8 +155,8 @@ export const placeOrder = async (req, res) => {
         payment_method_types: paymentMethod === "upi" ? ["card"] : ["card"],
         line_items: line_items,
         mode: "payment",
-        success_url: `${frontend_url}/verify?success=true&orderId=${savedOrder._id}&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${frontend_url}/verify?success=false&orderId=${savedOrder._id}`,
+        success_url: `${url}/verify?success=true&orderId=${savedOrder._id}&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${url}/verify?success=false&orderId=${savedOrder._id}`,
         customer_email: user.email,
         client_reference_id: savedOrder._id.toString(),
         metadata: {

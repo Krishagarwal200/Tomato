@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { useContext } from 'react';
+import { StoreContext } from '../../context/StoreContext';
 
 const Order = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const url = 'http://localhost:4000';
+  const { url } = useContext(StoreContext);
 
   const statusOptions = [
     'pending',

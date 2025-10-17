@@ -28,7 +28,7 @@ const Navbar = ({ setShowLogin, setaddStore }) => {
     }
   };
 
-  const { token, setToken, getTotalCartItems } = useContext(StoreContext);
+  const { token, setToken, getTotalCartItems, url } = useContext(StoreContext);
 
 
   const handleLogout = () => {
@@ -42,7 +42,7 @@ const Navbar = ({ setShowLogin, setaddStore }) => {
   };
 
   const handleRegisterStore = () => {
-    window.open('http://localhost:5173', '_blank');
+    window.open(url, '_blank');
     // setaddStore(true); // This will open the store registration modal
   };
 

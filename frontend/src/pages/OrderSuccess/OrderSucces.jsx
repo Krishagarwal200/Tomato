@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
+import { useContext } from 'react';
+import { StoreContext } from '../../context/StoreContext';
 
 const OrderSuccess = () => {
   const location = useLocation();
@@ -11,7 +13,7 @@ const OrderSuccess = () => {
 
   const orderData = location.state?.order;
   const message = location.state?.message;
-
+  const { url } = useContext(StoreContext);
   useEffect(() => {
     const fetchOrderDetails = async () => {
       try {
@@ -26,7 +28,7 @@ const OrderSuccess = () => {
 
           if (orderId) {
             const token = localStorage.getItem('token');
-            const response = await axios.get(`http://localhost:4000/api/order/${orderId}`, {
+            const response = await axios.get(`${url}/api/order/${orderId}`, {
               headers: {
                 'Authorization': `Bearer ${token}`
               }
@@ -175,7 +177,7 @@ const OrderSuccess = () => {
                       <div className="flex items-center space-x-4">
                         {item.image && (
                           <img
-                            src={`http://localhost:4000/images/${item.image}`}
+                            src={`${url}/images/${item.image}`}
                             alt={item.name}
                             className="w-16 h-16 rounded-lg object-cover"
                           />

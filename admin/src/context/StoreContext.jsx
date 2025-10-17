@@ -1,8 +1,8 @@
 import { createContext, useEffect, useState } from "react";
 
 export const StoreContext = createContext(null);
-
-const url = "http://localhost:4000";
+const API_URL = import.meta.env.VITE_API_URL;
+const url = API_URL;
 
 const StoreContextProvider = (props) => {
   // const [token, setToken] = useState("");

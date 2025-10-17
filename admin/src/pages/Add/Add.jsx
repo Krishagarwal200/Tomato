@@ -7,7 +7,7 @@ import { StoreContext } from '../../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
 
 const Add = () => {
-  const url = "http://localhost:4000";
+
   const navigate = useNavigate();
   const [image, setImage] = useState(false);
   const [productData, setProductData] = useState({
@@ -18,7 +18,7 @@ const Add = () => {
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const { storeToken, currentStore } = useContext(StoreContext);
+  const { storeToken, currentStore, url } = useContext(StoreContext);
 
   const onChangeHandler = (e) => {
     const name = e.target.name;

@@ -7,7 +7,7 @@ import { StoreContext } from '../../context/StoreContext';
 const List = () => {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { currentStore, storeToken } = useContext(StoreContext);
+  const { currentStore, storeToken, url } = useContext(StoreContext);
 
   const fetchStoreProducts = async () => {
     try {
@@ -24,7 +24,7 @@ const List = () => {
       console.log('Fetching products for store:', currentStore.id);
 
       // Fetch products specifically for this store
-      const response = await axios.get(`http://localhost:4000/api/food/store/${currentStore.id}`, {
+      const response = await axios.get(`${url}/api/food/store/${currentStore.id}`, {
         headers: {
           'Authorization': `Bearer ${storeToken}`
         }
@@ -58,7 +58,7 @@ const List = () => {
     }
 
     try {
-      const response = await axios.delete(`http://localhost:4000/api/food/${id}`, {
+      const response = await axios.delete(`${url}/api/food/${id}`, {
         headers: {
           'Authorization': `Bearer ${storeToken}`
         }
@@ -167,7 +167,7 @@ const List = () => {
               {/* Image */}
               <div className='h-48 overflow-hidden'>
                 <img
-                  src={item.image ? `http://localhost:4000/images/${item.image}` : '/placeholder-food.jpg'}
+                  src={item.image ? `${url}/images/${item.image}` : '/placeholder-food.jpg'}
                   alt={item.name}
                   className='w-full h-full object-cover hover:scale-105 transition-transform duration-300'
                   onError={(e) => {
